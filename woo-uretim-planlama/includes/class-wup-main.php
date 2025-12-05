@@ -705,8 +705,8 @@ class WUP_Main {
         echo '</table>';
         
         // Durum Süreleri
-        echo '<h2>' . esc_html__('Durum Süreleri (Saniye)', 'woo-uretim-planlama') . '</h2>';
-        echo '<p class="description">' . esc_html__('Her durum için tahmini işlem süresi. Örnek: 1 saat = 3600 saniye.', 'woo-uretim-planlama') . '</p>';
+        echo '<h2>' . esc_html__('Durum Süreleri (Dakika)', 'woo-uretim-planlama') . '</h2>';
+        echo '<p class="description">' . esc_html__('Her durum için tahmini işlem süresi dakika cinsinden. Örnek: 1 saat = 60 dakika.', 'woo-uretim-planlama') . '</p>';
         echo '<table class="form-table wup-status-durations">';
         
         $statuses = wc_get_order_statuses();
@@ -716,7 +716,7 @@ class WUP_Main {
             
             echo '<tr>';
             echo '<th><label for="status_' . esc_attr($key) . '">' . esc_html($label) . '</label></th>';
-            echo '<td><input type="number" name="wup_settings[status_durations][' . esc_attr($key) . ']" id="status_' . esc_attr($key) . '" value="' . esc_attr($duration) . '" min="0" class="small-text"> ' . esc_html__('saniye', 'woo-uretim-planlama') . '</td>';
+            echo '<td><input type="number" name="wup_settings[status_durations][' . esc_attr($key) . ']" id="status_' . esc_attr($key) . '" value="' . esc_attr($duration) . '" min="0" class="small-text"> ' . esc_html__('dakika', 'woo-uretim-planlama') . '</td>';
             echo '</tr>';
         }
         
@@ -749,9 +749,12 @@ class WUP_Main {
         echo '<h2>' . esc_html__('Performans', 'woo-uretim-planlama') . '</h2>';
         echo '<table class="form-table">';
         
+        // Cache duration'ı dakika olarak göster
+        $cache_minutes = intval($settings['cache_duration'] / 60);
+        
         echo '<tr>';
-        echo '<th><label for="cache_duration">' . esc_html__('Önbellek Süresi (Saniye)', 'woo-uretim-planlama') . '</label></th>';
-        echo '<td><input type="number" name="wup_settings[cache_duration]" id="cache_duration" value="' . esc_attr($settings['cache_duration']) . '" min="60" class="small-text">';
+        echo '<th><label for="cache_duration">' . esc_html__('Önbellek Süresi (Dakika)', 'woo-uretim-planlama') . '</label></th>';
+        echo '<td><input type="number" name="wup_settings[cache_duration]" id="cache_duration" value="' . esc_attr($cache_minutes) . '" min="1" class="small-text">';
         echo '<p class="description">' . esc_html__('Rapor verilerinin önbellekte tutulma süresi.', 'woo-uretim-planlama') . '</p></td>';
         echo '</tr>';
         

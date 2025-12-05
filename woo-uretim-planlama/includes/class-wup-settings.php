@@ -99,19 +99,22 @@ class WUP_Settings {
         }
         
         if (isset($input['cache_duration'])) {
-            $output['cache_duration'] = max(60, absint($input['cache_duration']));
+            // Dakika olarak alıp saniyeye çevir (minimum 1 dakika = 60 saniye)
+            $output['cache_duration'] = max(60, absint($input['cache_duration']) * 60);
         }
         
         return $output;
     }
     
     /**
-     * Durum süresini al (saniye cinsinden)
+     * Durum süresini al (saniye cinsinden - dahili kullanım için dakikadan dönüştürülür)
      */
     public static function get_status_duration($status) {
         $durations = self::get('status_durations', array());
         $status_key = strpos($status, 'wc-') === 0 ? $status : 'wc-' . $status;
-        return isset($durations[$status_key]) ? absint($durations[$status_key]) : 0;
+        // Dakika olarak kaydedilen değeri saniyeye çevir
+        $minutes = isset($durations[$status_key]) ? absint($durations[$status_key]) : 0;
+        return $minutes * 60;
     }
     
     /**
