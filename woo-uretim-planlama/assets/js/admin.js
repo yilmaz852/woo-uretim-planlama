@@ -121,8 +121,7 @@
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: true,
-                        aspectRatio: 2,
+                        maintainAspectRatio: false,
                         plugins: {
                             legend: {
                                 display: false
@@ -166,8 +165,7 @@
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: true,
-                        aspectRatio: 2,
+                        maintainAspectRatio: false,
                         plugins: {
                             tooltip: {
                                 callbacks: {
@@ -206,8 +204,7 @@
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: true,
-                        aspectRatio: 2,
+                        maintainAspectRatio: false,
                         plugins: {
                             legend: {
                                 position: 'right'
@@ -230,8 +227,7 @@
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: true,
-                        aspectRatio: 2,
+                        maintainAspectRatio: false,
                         plugins: {
                             tooltip: {
                                 callbacks: {

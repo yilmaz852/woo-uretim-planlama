@@ -213,7 +213,7 @@ class WUP_Analytics {
         if (!empty($trend_data['dates'])) {
             echo '<div class="wup-chart-container">';
             echo '<h2>' . esc_html__('Günlük Ortalama Süre Trendi (Saat)', 'woo-uretim-planlama') . '</h2>';
-            echo '<canvas id="trendChart"></canvas>';
+            echo '<div class="wup-chart-wrapper"><canvas id="trendChart"></canvas></div>';
             echo '</div>';
             
             $chart_data = array(
@@ -247,7 +247,7 @@ class WUP_Analytics {
         if (!empty($distribution)) {
             echo '<div class="wup-chart-container">';
             echo '<h2>' . esc_html__('Durum Dağılımı', 'woo-uretim-planlama') . '</h2>';
-            echo '<canvas id="distributionChart"></canvas>';
+            echo '<div class="wup-chart-wrapper"><canvas id="distributionChart"></canvas></div>';
             echo '</div>';
             
             $chart_data = array(
@@ -265,7 +265,7 @@ class WUP_Analytics {
         if (!empty($weekday_data)) {
             echo '<div class="wup-chart-container">';
             echo '<h2>' . esc_html__('Haftanın Günlerine Göre Ortalama Süre (Saat)', 'woo-uretim-planlama') . '</h2>';
-            echo '<canvas id="weekdayChart"></canvas>';
+            echo '<div class="wup-chart-wrapper"><canvas id="weekdayChart"></canvas></div>';
             echo '</div>';
             
             $day_names = array(
