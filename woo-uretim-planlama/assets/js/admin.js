@@ -68,6 +68,23 @@
     }
     
     /**
+     * Süreyi saat formatında göster
+     */
+    function formatHours(hours) {
+        if (!hours || hours < 0) return '0 saat';
+        
+        var h = Math.floor(hours);
+        var m = Math.round((hours - h) * 60);
+        
+        if (h === 0 && m > 0) {
+            return m + ' dk';
+        } else if (m === 0) {
+            return h + ' saat';
+        }
+        return h + ' saat ' + m + ' dk';
+    }
+    
+    /**
      * Süreyi formatla (HH:MM:SS)
      */
     function formatDuration(seconds) {
@@ -137,7 +154,7 @@
      * Analiz sayfası
      */
     function initAnalyticsPage() {
-        // Trend grafiği
+        // Trend grafiği (Saat cinsinden)
         if (typeof wupTrendData !== 'undefined' && typeof Chart !== 'undefined') {
             var ctx = document.getElementById('trendChart');
             if (ctx) {
@@ -155,7 +172,7 @@
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
-                                        return context.dataset.label + ': ' + formatDuration(context.raw);
+                                        return context.dataset.label + ': ' + formatHours(context.raw);
                                     }
                                 }
                             }
@@ -165,7 +182,7 @@
                                 beginAtZero: true,
                                 title: {
                                     display: true,
-                                    text: 'Saniye'
+                                    text: 'Saat'
                                 }
                             }
                         }
@@ -201,7 +218,7 @@
             }
         }
         
-        // Haftalık grafik
+        // Haftalık grafik (Saat cinsinden)
         if (typeof wupWeekdayData !== 'undefined' && typeof Chart !== 'undefined') {
             var ctx = document.getElementById('weekdayChart');
             if (ctx) {
@@ -219,7 +236,7 @@
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
-                                        return context.dataset.label + ': ' + formatDuration(context.raw);
+                                        return context.dataset.label + ': ' + formatHours(context.raw);
                                     }
                                 }
                             }
@@ -229,7 +246,7 @@
                                 beginAtZero: true,
                                 title: {
                                     display: true,
-                                    text: 'Saniye'
+                                    text: 'Saat'
                                 }
                             }
                         }

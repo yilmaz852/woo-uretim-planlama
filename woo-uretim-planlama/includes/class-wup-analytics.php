@@ -25,7 +25,7 @@ class WUP_Analytics {
     }
     
     /**
-     * Trend verisini al
+     * Trend verisini al (saat cinsinden)
      */
     public function get_trend_data($start_date = null, $end_date = null) {
         $cache_key = 'trend_' . md5($start_date . $end_date);
@@ -72,7 +72,9 @@ class WUP_Analytics {
                     $data['values'][$status_name] = array();
                 }
                 
-                $data['values'][$status_name][$date] = round($row->avg_duration);
+                // Saniyeyi saate çevir (2 ondalık basamak)
+                $hours = round($row->avg_duration / 3600, 2);
+                $data['values'][$status_name][$date] = $hours;
             }
             
             // Eksik tarihleri 0 ile doldur
@@ -124,7 +126,7 @@ class WUP_Analytics {
     }
     
     /**
-     * Haftanın günlerine göre analiz
+     * Haftanın günlerine göre analiz (saat cinsinden)
      */
     public function get_weekday_analysis($start_date = null, $end_date = null) {
         $cache_key = 'weekday_' . md5($start_date . $end_date);
@@ -163,7 +165,8 @@ class WUP_Analytics {
                 // MySQL DAYOFWEEK: 1=Pazar, 2=Pazartesi, ... 7=Cumartesi
                 // PHP'de: 0=Pazar, 1=Pazartesi, ... 6=Cumartesi
                 $php_day = ($row->weekday - 1);
-                $data[$status_name][$php_day] = round($row->avg_duration);
+                // Saniyeyi saate çevir (2 ondalık basamak)
+                $data[$status_name][$php_day] = round($row->avg_duration / 3600, 2);
             }
             
             return $data;
@@ -209,7 +212,7 @@ class WUP_Analytics {
         $trend_data = $this->get_trend_data($start_date, $end_date);
         if (!empty($trend_data['dates'])) {
             echo '<div class="wup-chart-container">';
-            echo '<h2>' . esc_html__('Günlük Ortalama Süre Trendi', 'woo-uretim-planlama') . '</h2>';
+            echo '<h2>' . esc_html__('Günlük Ortalama Süre Trendi (Saat)', 'woo-uretim-planlama') . '</h2>';
             echo '<canvas id="trendChart"></canvas>';
             echo '</div>';
             
@@ -261,7 +264,7 @@ class WUP_Analytics {
         $weekday_data = $this->get_weekday_analysis($start_date, $end_date);
         if (!empty($weekday_data)) {
             echo '<div class="wup-chart-container">';
-            echo '<h2>' . esc_html__('Haftanın Günlerine Göre Ortalama Süre', 'woo-uretim-planlama') . '</h2>';
+            echo '<h2>' . esc_html__('Haftanın Günlerine Göre Ortalama Süre (Saat)', 'woo-uretim-planlama') . '</h2>';
             echo '<canvas id="weekdayChart"></canvas>';
             echo '</div>';
             
