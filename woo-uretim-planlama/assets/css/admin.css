@@ -67,12 +67,21 @@
     margin: 20px 0;
     border-radius: 4px;
     position: relative;
-    min-height: 350px;
+    height: 400px;
     max-width: 900px;
+    overflow: hidden;
+}
+
+.wup-chart-container h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
 }
 
 .wup-chart-container canvas {
     max-width: 100%;
+    max-height: 320px !important;
+    width: 100% !important;
+    height: auto !important;
 }
 
 /* Takvim */
