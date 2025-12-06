@@ -704,23 +704,51 @@ class WUP_Main {
         
         echo '</table>';
         
-        // Durum Süreleri
-        echo '<h2>' . esc_html__('Durum Süreleri (Dakika)', 'woo-uretim-planlama') . '</h2>';
-        echo '<p class="description">' . esc_html__('Her durum için tahmini işlem süresi dakika cinsinden. Örnek: 1 saat = 60 dakika.', 'woo-uretim-planlama') . '</p>';
-        echo '<table class="form-table wup-status-durations">';
+        // Departman/Durum Ayarları
+        echo '<h2>' . esc_html__('Departman Ayarları (Durum Bazlı)', 'woo-uretim-planlama') . '</h2>';
+        echo '<p class="description">' . esc_html__('Her durum için işçi sayısı ve tam kadro ile işlem süresi. Örnek: Boyahane\'de 3 işçi çalışıyor ve boya işlemi 180 dakika (3 saat) sürüyor.', 'woo-uretim-planlama') . '</p>';
+        echo '<p class="description" style="color:#0073aa;"><strong>' . esc_html__('Not: Süre, belirtilen işçi sayısı ile tamamlanma süresidir. Daha az işçi = daha uzun süre (otomatik hesaplanır).', 'woo-uretim-planlama') . '</strong></p>';
+        
+        echo '<table class="widefat fixed striped" style="max-width:800px; margin-top:15px;">';
+        echo '<thead><tr>';
+        echo '<th style="width:35%;">' . esc_html__('Durum / Departman', 'woo-uretim-planlama') . '</th>';
+        echo '<th style="width:25%;">' . esc_html__('İşçi Sayısı', 'woo-uretim-planlama') . '</th>';
+        echo '<th style="width:25%;">' . esc_html__('İşlem Süresi', 'woo-uretim-planlama') . '</th>';
+        echo '<th style="width:15%;">' . esc_html__('Tek İşçi Süresi', 'woo-uretim-planlama') . '</th>';
+        echo '</tr></thead>';
+        echo '<tbody>';
         
         $statuses = wc_get_order_statuses();
         
         foreach ($statuses as $key => $label) {
             $duration = isset($settings['status_durations'][$key]) ? $settings['status_durations'][$key] : 0;
+            $workers = isset($settings['status_workers'][$key]) ? $settings['status_workers'][$key] : 1;
+            
+            // Tek işçi ile süre hesapla
+            $single_worker_duration = $duration * $workers;
+            $single_worker_hours = round($single_worker_duration / 60, 1);
             
             echo '<tr>';
-            echo '<th><label for="status_' . esc_attr($key) . '">' . esc_html($label) . '</label></th>';
-            echo '<td><input type="number" name="wup_settings[status_durations][' . esc_attr($key) . ']" id="status_' . esc_attr($key) . '" value="' . esc_attr($duration) . '" min="0" class="small-text"> ' . esc_html__('dakika', 'woo-uretim-planlama') . '</td>';
+            echo '<td><strong>' . esc_html($label) . '</strong></td>';
+            echo '<td>';
+            echo '<input type="number" name="wup_settings[status_workers][' . esc_attr($key) . ']" value="' . esc_attr($workers) . '" min="1" class="small-text" style="width:60px;"> ';
+            echo esc_html__('kişi', 'woo-uretim-planlama');
+            echo '</td>';
+            echo '<td>';
+            echo '<input type="number" name="wup_settings[status_durations][' . esc_attr($key) . ']" value="' . esc_attr($duration) . '" min="0" class="small-text" style="width:80px;"> ';
+            echo esc_html__('dakika', 'woo-uretim-planlama');
+            echo '</td>';
+            echo '<td>';
+            if ($duration > 0) {
+                echo '<span style="color:#666;">' . esc_html($single_worker_hours) . ' ' . esc_html__('saat', 'woo-uretim-planlama') . '</span>';
+            } else {
+                echo '<span style="color:#999;">-</span>';
+            }
+            echo '</td>';
             echo '</tr>';
         }
         
-        echo '</table>';
+        echo '</tbody></table>';
         
         // Bildirim Ayarları
         echo '<h2>' . esc_html__('Bildirim Ayarları', 'woo-uretim-planlama') . '</h2>';

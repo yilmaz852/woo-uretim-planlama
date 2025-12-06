@@ -231,6 +231,9 @@ class WUP_Scheduler {
             __('Açık siparişler için tahmini üretim süreleri ve tamamlanma tarihleri.', 'woo-uretim-planlama')
         );
         
+        // Departman/İşçi özeti
+        $this->render_department_summary();
+        
         $schedule = $this->get_schedule();
         
         if (empty($schedule['orders'])) {
@@ -243,6 +246,7 @@ class WUP_Scheduler {
             echo '<th style="width:80px;">' . esc_html__('Sipariş', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Müşteri', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Durum', 'woo-uretim-planlama') . '</th>';
+            echo '<th>' . esc_html__('İşçi', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Geçmiş Ort.', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Kalan Süre', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Tahmini Bitiş', 'woo-uretim-planlama') . '</th>';
@@ -253,11 +257,13 @@ class WUP_Scheduler {
             foreach ($schedule['orders'] as $item) {
                 $order_url = admin_url('post.php?post=' . $item['order_id'] . '&action=edit');
                 $status_name = wc_get_order_status_name($item['status']);
+                $workers = WUP_Settings::get_status_workers('wc-' . $item['status']);
                 
                 echo '<tr>';
                 echo '<td><a href="' . esc_url($order_url) . '">#' . esc_html($item['order_id']) . '</a></td>';
                 echo '<td>' . esc_html($item['customer']) . '</td>';
                 echo '<td>' . esc_html($status_name) . '</td>';
+                echo '<td>' . esc_html($workers) . ' ' . esc_html__('kişi', 'woo-uretim-planlama') . '</td>';
                 echo '<td>' . esc_html($item['actual_avg_formatted']) . '</td>';
                 echo '<td>' . esc_html($item['remaining_formatted']) . '</td>';
                 echo '<td>' . esc_html($item['completion_formatted']) . '</td>';
@@ -286,6 +292,66 @@ class WUP_Scheduler {
         }
         
         WUP_UI::page_footer();
+    }
+    
+    /**
+     * Departman/İşçi özeti
+     */
+    private function render_department_summary() {
+        $statuses = wc_get_order_statuses();
+        $settings = WUP_Settings::get_all();
+        
+        // Sadece ayarlanmış durumları göster
+        $configured_statuses = array();
+        foreach ($statuses as $key => $label) {
+            $duration = isset($settings['status_durations'][$key]) ? $settings['status_durations'][$key] : 0;
+            $workers = isset($settings['status_workers'][$key]) ? $settings['status_workers'][$key] : 1;
+            
+            if ($duration > 0) {
+                $configured_statuses[$key] = array(
+                    'label' => $label,
+                    'duration' => $duration,
+                    'workers' => $workers
+                );
+            }
+        }
+        
+        if (empty($configured_statuses)) {
+            return;
+        }
+        
+        echo '<h2>' . esc_html__('Departman Kapasitesi', 'woo-uretim-planlama') . '</h2>';
+        echo '<table class="widefat fixed striped" style="max-width:700px;">';
+        echo '<thead><tr>';
+        echo '<th>' . esc_html__('Departman', 'woo-uretim-planlama') . '</th>';
+        echo '<th>' . esc_html__('İşçi Sayısı', 'woo-uretim-planlama') . '</th>';
+        echo '<th>' . esc_html__('İşlem Süresi', 'woo-uretim-planlama') . '</th>';
+        echo '<th>' . esc_html__('Tek İşçi Süresi', 'woo-uretim-planlama') . '</th>';
+        echo '</tr></thead>';
+        echo '<tbody>';
+        
+        $total_workers = 0;
+        
+        foreach ($configured_statuses as $key => $data) {
+            $total_workers += $data['workers'];
+            $single_worker_hours = round(($data['duration'] * $data['workers']) / 60, 1);
+            $configured_hours = round($data['duration'] / 60, 1);
+            
+            echo '<tr>';
+            echo '<td><strong>' . esc_html($data['label']) . '</strong></td>';
+            echo '<td>' . esc_html($data['workers']) . ' ' . esc_html__('kişi', 'woo-uretim-planlama') . '</td>';
+            echo '<td>' . esc_html($configured_hours) . ' ' . esc_html__('saat', 'woo-uretim-planlama') . '</td>';
+            echo '<td style="color:#666;">' . esc_html($single_worker_hours) . ' ' . esc_html__('saat', 'woo-uretim-planlama') . '</td>';
+            echo '</tr>';
+        }
+        
+        echo '</tbody>';
+        echo '<tfoot><tr>';
+        echo '<th>' . esc_html__('Toplam', 'woo-uretim-planlama') . '</th>';
+        echo '<th colspan="3">' . esc_html($total_workers) . ' ' . esc_html__('işçi', 'woo-uretim-planlama') . '</th>';
+        echo '</tr></tfoot>';
+        echo '</table>';
+        echo '<br>';
     }
     
     /**

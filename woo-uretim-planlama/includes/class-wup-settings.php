@@ -53,7 +53,8 @@ class WUP_Settings {
             'personnel_count' => 1,
             'daily_hours' => 8,
             'working_days' => array('1', '2', '3', '4', '5'),
-            'status_durations' => array(),
+            'status_durations' => array(),    // Temel süre (dakika) - tam kadro ile
+            'status_workers' => array(),      // Her durum için işçi sayısı
             'notifications_enabled' => 0,
             'notification_threshold' => 24,
             'notification_email' => get_option('admin_email'),
@@ -86,6 +87,14 @@ class WUP_Settings {
             }
         }
         
+        // Her durum için işçi sayısı
+        if (isset($input['status_workers']) && is_array($input['status_workers'])) {
+            $output['status_workers'] = array();
+            foreach ($input['status_workers'] as $status => $workers) {
+                $output['status_workers'][sanitize_key($status)] = max(1, absint($workers));
+            }
+        }
+        
         if (isset($input['notifications_enabled'])) {
             $output['notifications_enabled'] = $input['notifications_enabled'] ? 1 : 0;
         }
@@ -107,14 +116,53 @@ class WUP_Settings {
     }
     
     /**
-     * Durum süresini al (saniye cinsinden - dahili kullanım için dakikadan dönüştürülür)
+     * Durum için işçi sayısını al
      */
-    public static function get_status_duration($status) {
+    public static function get_status_workers($status) {
+        $workers = self::get('status_workers', array());
+        $status_key = strpos($status, 'wc-') === 0 ? $status : 'wc-' . $status;
+        return isset($workers[$status_key]) ? max(1, absint($workers[$status_key])) : 1;
+    }
+    
+    /**
+     * Durum için temel süreyi al (tam kadro ile dakika cinsinden)
+     */
+    public static function get_status_base_duration($status) {
         $durations = self::get('status_durations', array());
         $status_key = strpos($status, 'wc-') === 0 ? $status : 'wc-' . $status;
-        // Dakika olarak kaydedilen değeri saniyeye çevir
-        $minutes = isset($durations[$status_key]) ? absint($durations[$status_key]) : 0;
-        return $minutes * 60;
+        return isset($durations[$status_key]) ? absint($durations[$status_key]) : 0;
+    }
+    
+    /**
+     * Durum süresini al (saniye cinsinden - işçi sayısına göre hesaplanır)
+     * Formül: Temel süre / mevcut işçi sayısı * standart işçi sayısı
+     * Örnek: 3 işçi ile 180dk = 1 işçi ile 540dk (180 / 3 * 1 = 60dk per işçi, tek işçi = 180dk, ters)
+     * Doğru formül: 3 işçi ile 180dk demek, 1 işçi 540dk yapar (180 * 3 / 1)
+     */
+    public static function get_status_duration($status, $custom_workers = null) {
+        $base_minutes = self::get_status_base_duration($status);
+        
+        if ($base_minutes <= 0) {
+            return 0;
+        }
+        
+        $configured_workers = self::get_status_workers($status);
+        $actual_workers = $custom_workers !== null ? max(1, $custom_workers) : $configured_workers;
+        
+        // Temel süre tam kadro ile belirlenmiş süre
+        // Daha az işçi = daha uzun süre
+        // Örnek: 3 işçi ile 180dk → 1 işçi ile: 180 * (3/1) = 540dk
+        $adjusted_minutes = $base_minutes * ($configured_workers / $actual_workers);
+        
+        // Dakikayı saniyeye çevir
+        return round($adjusted_minutes * 60);
+    }
+    
+    /**
+     * Durum için süre simulasyonu (farklı işçi sayıları ile)
+     */
+    public static function simulate_duration($status, $worker_count) {
+        return self::get_status_duration($status, $worker_count);
     }
     
     /**
@@ -131,5 +179,17 @@ class WUP_Settings {
         $personnel = self::get('personnel_count', 1);
         $hours = self::get('daily_hours', 8);
         return $personnel * $hours * 3600;
+    }
+    
+    /**
+     * Toplam işçi sayısını al (tüm departmanların toplamı)
+     */
+    public static function get_total_workers() {
+        $workers = self::get('status_workers', array());
+        $total = 0;
+        foreach ($workers as $count) {
+            $total += absint($count);
+        }
+        return max(1, $total);
     }
 }
