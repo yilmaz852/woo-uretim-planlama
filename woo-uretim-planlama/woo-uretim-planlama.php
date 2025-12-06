@@ -54,11 +54,15 @@ function wup_init() {
     require_once WUP_PLUGIN_PATH . 'includes/class-wup-cache.php';
     require_once WUP_PLUGIN_PATH . 'includes/class-wup-settings.php';
     require_once WUP_PLUGIN_PATH . 'includes/class-wup-ui.php';
+    require_once WUP_PLUGIN_PATH . 'includes/class-wup-departments.php';
     require_once WUP_PLUGIN_PATH . 'includes/class-wup-dashboard.php';
     require_once WUP_PLUGIN_PATH . 'includes/class-wup-analytics.php';
     require_once WUP_PLUGIN_PATH . 'includes/class-wup-scheduler.php';
     require_once WUP_PLUGIN_PATH . 'includes/class-wup-calendar.php';
     require_once WUP_PLUGIN_PATH . 'includes/class-wup-main.php';
+    
+    // Departman yönetimini başlat
+    WUP_Departments::get_instance();
     
     // Ana sınıfı başlat
     WUP_Main::get_instance();

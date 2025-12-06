@@ -92,14 +92,21 @@ class WUP_Scheduler {
                 // Gerçek geçmiş ortalama
                 $actual_avg = $this->get_actual_average($order->get_id());
                 
+                // Mevcut departmanı bul
+                $current_dept = WUP_Departments::get_department_by_status('wc-' . $order->get_status());
+                
                 $schedule['orders'][] = array(
                     'order' => $order,
                     'order_id' => $order->get_id(),
                     'customer' => $order->get_formatted_billing_full_name(),
                     'status' => $order->get_status(),
+                    'department' => $current_dept ? $current_dept['name'] : '-',
+                    'department_color' => $current_dept ? $current_dept['color'] : '#ccc',
+                    'department_workers' => $current_dept ? $current_dept['workers'] : 0,
                     'remaining_seconds' => $remaining['seconds'],
                     'remaining_formatted' => WUP_UI::format_business_hours($remaining['seconds']),
                     'next_statuses' => $remaining['next_statuses'],
+                    'next_departments' => isset($remaining['departments']) ? $remaining['departments'] : array(),
                     'completion_date' => $completion_date,
                     'completion_formatted' => $completion_date ? WUP_UI::format_date($completion_date) : '-',
                     'actual_avg_seconds' => $actual_avg,
@@ -117,7 +124,7 @@ class WUP_Scheduler {
     }
     
     /**
-     * Sipariş için kalan süreyi hesapla
+     * Sipariş için kalan süreyi hesapla (departman bazlı)
      */
     private function calculate_remaining_time($order) {
         $current_status = 'wc-' . $order->get_status();
@@ -126,16 +133,25 @@ class WUP_Scheduler {
         
         $result = array(
             'seconds' => 0,
-            'next_statuses' => array()
+            'next_statuses' => array(),
+            'departments' => array()
         );
         
         if ($current_index === false || in_array($current_status, $this->final_statuses)) {
             return $result;
         }
         
-        // Mevcut durum süresini ekle
-        $current_duration = WUP_Settings::get_status_duration($current_status);
-        $result['seconds'] += $current_duration;
+        // Mevcut durum için departman kontrolü
+        $current_dept = WUP_Departments::get_department_by_status($current_status);
+        if ($current_dept) {
+            $duration = WUP_Departments::get_duration($current_dept['id']);
+            $result['seconds'] += $duration;
+            $result['departments'][] = $current_dept['name'];
+        } else {
+            // Departman yoksa eski sistemden al
+            $current_duration = WUP_Settings::get_status_duration($current_status);
+            $result['seconds'] += $current_duration;
+        }
         
         // Sonraki durumların sürelerini ekle
         for ($i = $current_index + 1; $i < count($all_statuses); $i++) {
@@ -145,12 +161,25 @@ class WUP_Scheduler {
                 break;
             }
             
-            $duration = WUP_Settings::get_status_duration($status);
-            
-            if ($duration > 0) {
-                $result['seconds'] += $duration;
-                $status_name = wc_get_order_status_name(str_replace('wc-', '', $status));
-                $result['next_statuses'][] = $status_name;
+            // Departman kontrolü
+            $dept = WUP_Departments::get_department_by_status($status);
+            if ($dept) {
+                $duration = WUP_Departments::get_duration($dept['id']);
+                if ($duration > 0) {
+                    $result['seconds'] += $duration;
+                    $result['next_statuses'][] = wc_get_order_status_name(str_replace('wc-', '', $status));
+                    if (!in_array($dept['name'], $result['departments'])) {
+                        $result['departments'][] = $dept['name'];
+                    }
+                }
+            } else {
+                // Departman yoksa eski sistemden al
+                $duration = WUP_Settings::get_status_duration($status);
+                if ($duration > 0) {
+                    $result['seconds'] += $duration;
+                    $status_name = wc_get_order_status_name(str_replace('wc-', '', $status));
+                    $result['next_statuses'][] = $status_name;
+                }
             }
         }
         
@@ -243,31 +272,37 @@ class WUP_Scheduler {
             
             echo '<table class="widefat fixed striped wup-schedule-table">';
             echo '<thead><tr>';
-            echo '<th style="width:80px;">' . esc_html__('Sipariş', 'woo-uretim-planlama') . '</th>';
+            echo '<th style="width:70px;">' . esc_html__('Sipariş', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Müşteri', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Durum', 'woo-uretim-planlama') . '</th>';
+            echo '<th>' . esc_html__('Departman', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('İşçi', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Geçmiş Ort.', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Kalan Süre', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Tahmini Bitiş', 'woo-uretim-planlama') . '</th>';
-            echo '<th>' . esc_html__('Sonraki Adımlar', 'woo-uretim-planlama') . '</th>';
+            echo '<th>' . esc_html__('Sonraki', 'woo-uretim-planlama') . '</th>';
             echo '</tr></thead>';
             echo '<tbody>';
             
             foreach ($schedule['orders'] as $item) {
                 $order_url = admin_url('post.php?post=' . $item['order_id'] . '&action=edit');
                 $status_name = wc_get_order_status_name($item['status']);
-                $workers = WUP_Settings::get_status_workers('wc-' . $item['status']);
                 
                 echo '<tr>';
                 echo '<td><a href="' . esc_url($order_url) . '">#' . esc_html($item['order_id']) . '</a></td>';
                 echo '<td>' . esc_html($item['customer']) . '</td>';
                 echo '<td>' . esc_html($status_name) . '</td>';
-                echo '<td>' . esc_html($workers) . ' ' . esc_html__('kişi', 'woo-uretim-planlama') . '</td>';
+                echo '<td>';
+                if ($item['department'] !== '-') {
+                    echo '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' . esc_attr($item['department_color']) . ';margin-right:5px;"></span>';
+                }
+                echo esc_html($item['department']);
+                echo '</td>';
+                echo '<td>' . ($item['department_workers'] > 0 ? esc_html($item['department_workers']) . ' ' . esc_html__('kişi', 'woo-uretim-planlama') : '-') . '</td>';
                 echo '<td>' . esc_html($item['actual_avg_formatted']) . '</td>';
                 echo '<td>' . esc_html($item['remaining_formatted']) . '</td>';
                 echo '<td>' . esc_html($item['completion_formatted']) . '</td>';
-                echo '<td style="font-size:0.9em;">' . esc_html(implode(' → ', $item['next_statuses'])) . '</td>';
+                echo '<td style="font-size:0.85em;">' . esc_html(implode(' → ', $item['next_statuses'])) . '</td>';
                 echo '</tr>';
             }
             
@@ -295,60 +330,69 @@ class WUP_Scheduler {
     }
     
     /**
-     * Departman/İşçi özeti
+     * Departman/İşçi özeti (yeni departman sisteminden)
      */
     private function render_department_summary() {
-        $statuses = wc_get_order_statuses();
-        $settings = WUP_Settings::get_all();
+        $departments = WUP_Departments::get_all();
         
-        // Sadece ayarlanmış durumları göster
-        $configured_statuses = array();
-        foreach ($statuses as $key => $label) {
-            $duration = isset($settings['status_durations'][$key]) ? $settings['status_durations'][$key] : 0;
-            $workers = isset($settings['status_workers'][$key]) ? $settings['status_workers'][$key] : 1;
-            
-            if ($duration > 0) {
-                $configured_statuses[$key] = array(
-                    'label' => $label,
-                    'duration' => $duration,
-                    'workers' => $workers
-                );
+        // Sadece yapılandırılmış departmanları göster
+        $configured_depts = array();
+        foreach ($departments as $dept) {
+            if ($dept['base_duration'] > 0) {
+                $configured_depts[] = $dept;
             }
         }
         
-        if (empty($configured_statuses)) {
+        if (empty($configured_depts)) {
+            echo '<p class="description">' . esc_html__('Departman ayarları için', 'woo-uretim-planlama') . ' <a href="' . esc_url(admin_url('admin.php?page=wup-departments')) . '">' . esc_html__('Departmanlar', 'woo-uretim-planlama') . '</a> ' . esc_html__('sayfasını ziyaret edin.', 'woo-uretim-planlama') . '</p>';
             return;
         }
         
         echo '<h2>' . esc_html__('Departman Kapasitesi', 'woo-uretim-planlama') . '</h2>';
-        echo '<table class="widefat fixed striped" style="max-width:700px;">';
+        echo '<p class="description">' . esc_html__('Departman detayları için', 'woo-uretim-planlama') . ' <a href="' . esc_url(admin_url('admin.php?page=wup-departments')) . '">' . esc_html__('Departmanlar', 'woo-uretim-planlama') . '</a> ' . esc_html__('sayfasını kullanın.', 'woo-uretim-planlama') . '</p>';
+        
+        echo '<table class="widefat fixed striped" style="max-width:800px; margin-top:15px;">';
         echo '<thead><tr>';
         echo '<th>' . esc_html__('Departman', 'woo-uretim-planlama') . '</th>';
         echo '<th>' . esc_html__('İşçi Sayısı', 'woo-uretim-planlama') . '</th>';
         echo '<th>' . esc_html__('İşlem Süresi', 'woo-uretim-planlama') . '</th>';
         echo '<th>' . esc_html__('Tek İşçi Süresi', 'woo-uretim-planlama') . '</th>';
+        echo '<th>' . esc_html__('Bağlı Durumlar', 'woo-uretim-planlama') . '</th>';
         echo '</tr></thead>';
         echo '<tbody>';
         
         $total_workers = 0;
+        $status_names = wc_get_order_statuses();
         
-        foreach ($configured_statuses as $key => $data) {
-            $total_workers += $data['workers'];
-            $single_worker_hours = round(($data['duration'] * $data['workers']) / 60, 1);
-            $configured_hours = round($data['duration'] / 60, 1);
+        foreach ($configured_depts as $dept) {
+            $total_workers += $dept['workers'];
+            $single_worker_hours = round(WUP_Departments::get_single_worker_duration($dept['id']) / 60, 1);
+            $configured_hours = round($dept['base_duration'] / 60, 1);
+            
+            // Bağlı durumları listele
+            $linked_statuses = array();
+            foreach ($dept['statuses'] as $status_key) {
+                if (isset($status_names[$status_key])) {
+                    $linked_statuses[] = $status_names[$status_key];
+                }
+            }
             
             echo '<tr>';
-            echo '<td><strong>' . esc_html($data['label']) . '</strong></td>';
-            echo '<td>' . esc_html($data['workers']) . ' ' . esc_html__('kişi', 'woo-uretim-planlama') . '</td>';
+            echo '<td>';
+            echo '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' . esc_attr($dept['color']) . ';margin-right:8px;"></span>';
+            echo '<strong>' . esc_html($dept['name']) . '</strong>';
+            echo '</td>';
+            echo '<td>' . esc_html($dept['workers']) . ' ' . esc_html__('kişi', 'woo-uretim-planlama') . '</td>';
             echo '<td>' . esc_html($configured_hours) . ' ' . esc_html__('saat', 'woo-uretim-planlama') . '</td>';
             echo '<td style="color:#666;">' . esc_html($single_worker_hours) . ' ' . esc_html__('saat', 'woo-uretim-planlama') . '</td>';
+            echo '<td style="font-size:0.85em;">' . (empty($linked_statuses) ? '-' : esc_html(implode(', ', $linked_statuses))) . '</td>';
             echo '</tr>';
         }
         
         echo '</tbody>';
         echo '<tfoot><tr>';
         echo '<th>' . esc_html__('Toplam', 'woo-uretim-planlama') . '</th>';
-        echo '<th colspan="3">' . esc_html($total_workers) . ' ' . esc_html__('işçi', 'woo-uretim-planlama') . '</th>';
+        echo '<th colspan="4">' . esc_html($total_workers) . ' ' . esc_html__('işçi', 'woo-uretim-planlama') . '</th>';
         echo '</tr></tfoot>';
         echo '</table>';
         echo '<br>';
