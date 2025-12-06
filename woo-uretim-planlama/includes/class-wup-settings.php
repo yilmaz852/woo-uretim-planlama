@@ -174,22 +174,35 @@ class WUP_Settings {
     
     /**
      * Günlük kapasiteyi hesapla (saniye)
+     * Departmanlardan toplam işçi sayısını alır
      */
     public static function get_daily_capacity() {
-        $personnel = self::get('personnel_count', 1);
+        // Departmanlardan toplam işçi sayısını al
+        $total_workers = 0;
+        $departments = WUP_Departments::get_all();
+        
+        foreach ($departments as $dept) {
+            $total_workers += isset($dept['workers']) ? absint($dept['workers']) : 1;
+        }
+        
+        // Minimum 1 işçi
+        $total_workers = max(1, $total_workers);
+        
         $hours = self::get('daily_hours', 8);
-        return $personnel * $hours * 3600;
+        return $total_workers * $hours * 3600;
     }
     
     /**
      * Toplam işçi sayısını al (tüm departmanların toplamı)
      */
     public static function get_total_workers() {
-        $workers = self::get('status_workers', array());
-        $total = 0;
-        foreach ($workers as $count) {
-            $total += absint($count);
+        $total_workers = 0;
+        $departments = WUP_Departments::get_all();
+        
+        foreach ($departments as $dept) {
+            $total_workers += isset($dept['workers']) ? absint($dept['workers']) : 1;
         }
-        return max(1, $total);
+        
+        return max(1, $total_workers);
     }
 }
