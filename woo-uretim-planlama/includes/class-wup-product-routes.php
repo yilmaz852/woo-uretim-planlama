@@ -18,6 +18,7 @@ class WUP_Product_Routes {
     
     private static $instance = null;
     const OPTION_KEY = 'wup_product_routes';
+    const CATEGORY_MAP_KEY = 'wup_category_route_map';
     const PRODUCT_META_KEY = '_wup_cabinet_type';
     
     public static function get_instance() {
@@ -34,6 +35,7 @@ class WUP_Product_Routes {
         // AJAX işlemleri
         add_action('wp_ajax_wup_save_product_route', array($this, 'ajax_save_route'));
         add_action('wp_ajax_wup_delete_product_route', array($this, 'ajax_delete_route'));
+        add_action('wp_ajax_wup_save_category_mapping', array($this, 'ajax_save_category_mapping'));
         
         // WooCommerce ürün sayfasına meta box ekle
         add_action('add_meta_boxes', array($this, 'add_product_meta_box'));
@@ -160,10 +162,69 @@ class WUP_Product_Routes {
     }
     
     /**
+     * Kategori-Rota eşleştirmelerini al
+     */
+    public static function get_category_mappings() {
+        return get_option(self::CATEGORY_MAP_KEY, array());
+    }
+    
+    /**
+     * Kategori-Rota eşleştirmesini kaydet
+     */
+    public static function save_category_mapping($category_id, $route_id) {
+        $mappings = self::get_category_mappings();
+        
+        if (empty($route_id)) {
+            unset($mappings[$category_id]);
+        } else {
+            $mappings[$category_id] = sanitize_key($route_id);
+        }
+        
+        update_option(self::CATEGORY_MAP_KEY, $mappings);
+        WUP_Cache::clear_all();
+        
+        return $mappings;
+    }
+    
+    /**
      * Ürün için cabinet tipini al
+     * Önce ürün meta'ya bakar, yoksa kategorisine bakar
      */
     public static function get_product_type($product_id) {
-        return get_post_meta($product_id, self::PRODUCT_META_KEY, true);
+        // Önce ürün meta'ya bak
+        $meta_type = get_post_meta($product_id, self::PRODUCT_META_KEY, true);
+        
+        if ($meta_type) {
+            return $meta_type;
+        }
+        
+        // Meta yoksa kategoriden belirle
+        $product = wc_get_product($product_id);
+        
+        if (!$product) {
+            return '';
+        }
+        
+        $category_ids = $product->get_category_ids();
+        $mappings = self::get_category_mappings();
+        
+        // Kategorileri kontrol et
+        foreach ($category_ids as $cat_id) {
+            if (isset($mappings[$cat_id])) {
+                return $mappings[$cat_id];
+            }
+            
+            // Alt kategori ise parent'ı kontrol et
+            $parent_id = wp_get_term_taxonomy_parent_id($cat_id, 'product_cat');
+            while ($parent_id) {
+                if (isset($mappings[$parent_id])) {
+                    return $mappings[$parent_id];
+                }
+                $parent_id = wp_get_term_taxonomy_parent_id($parent_id, 'product_cat');
+            }
+        }
+        
+        return '';
     }
     
     /**
@@ -322,18 +383,32 @@ class WUP_Product_Routes {
      * Ürün meta box render
      */
     public function render_product_meta_box($post) {
-        $current_type = self::get_product_type($post->ID);
+        // Ürün meta'daki değer
+        $meta_type = get_post_meta($post->ID, self::PRODUCT_META_KEY, true);
+        // Etkili tip (kategori dahil)
+        $effective_type = self::get_product_type($post->ID);
         $routes = self::get_all();
         
         wp_nonce_field('wup_product_type_nonce', 'wup_product_type_nonce');
         
-        echo '<p class="description">' . esc_html__('Bu ürün için üretim rotası seçin.', 'woo-uretim-planlama') . '</p>';
+        // Kategoriden gelen tip varsa bilgi göster
+        if (empty($meta_type) && $effective_type) {
+            $route = self::get($effective_type);
+            if ($route) {
+                echo '<div style="background:#e8f5e9;padding:8px;margin-bottom:10px;border-radius:4px;border-left:3px solid #27ae60;">';
+                echo '<strong>' . esc_html__('Kategoriden:', 'woo-uretim-planlama') . '</strong> ';
+                echo '<span style="color:' . esc_attr($route['color']) . ';font-weight:bold;">' . esc_html($route['name']) . '</span>';
+                echo '</div>';
+            }
+        }
+        
+        echo '<p class="description">' . esc_html__('Manuel seçim yapabilir veya kategoriden otomatik belirlenebilir.', 'woo-uretim-planlama') . '</p>';
         
         echo '<select name="wup_cabinet_type" id="wup_cabinet_type" style="width:100%;">';
-        echo '<option value="">' . esc_html__('-- Seçiniz --', 'woo-uretim-planlama') . '</option>';
+        echo '<option value="">' . esc_html__('-- Kategoriden Otomatik --', 'woo-uretim-planlama') . '</option>';
         
         foreach ($routes as $route) {
-            $selected = ($current_type === $route['id']) ? 'selected' : '';
+            $selected = ($meta_type === $route['id']) ? 'selected' : '';
             $duration = self::get_route_duration($route['id']);
             $hours = round($duration / 60, 1);
             
@@ -344,8 +419,8 @@ class WUP_Product_Routes {
         
         echo '</select>';
         
-        if ($current_type) {
-            $route = self::get($current_type);
+        if ($effective_type) {
+            $route = self::get($effective_type);
             if ($route) {
                 echo '<p style="margin-top:10px;"><strong>' . esc_html__('Departman Akışı:', 'woo-uretim-planlama') . '</strong></p>';
                 echo '<p style="font-size:0.9em;">';
@@ -480,6 +555,40 @@ class WUP_Product_Routes {
         } else {
             wp_send_json_error(array('message' => __('Rota bulunamadı.', 'woo-uretim-planlama')));
         }
+    }
+    
+    /**
+     * AJAX: Kategori eşleştirmesi kaydet
+     */
+    public function ajax_save_category_mapping() {
+        check_ajax_referer('wup_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Yetkiniz yok.', 'woo-uretim-planlama')));
+        }
+        
+        $mappings = isset($_POST['mappings']) ? (array)$_POST['mappings'] : array();
+        
+        // Tüm eşleştirmeleri temizle ve yeniden kaydet
+        delete_option(self::CATEGORY_MAP_KEY);
+        
+        $saved_mappings = array();
+        foreach ($mappings as $cat_id => $route_id) {
+            $cat_id = absint($cat_id);
+            $route_id = sanitize_key($route_id);
+            
+            if ($cat_id && $route_id) {
+                $saved_mappings[$cat_id] = $route_id;
+            }
+        }
+        
+        update_option(self::CATEGORY_MAP_KEY, $saved_mappings);
+        WUP_Cache::clear_all();
+        
+        wp_send_json_success(array(
+            'message' => __('Kategori eşleştirmeleri kaydedildi.', 'woo-uretim-planlama'),
+            'count' => count($saved_mappings)
+        ));
     }
     
     /**
@@ -649,6 +758,76 @@ class WUP_Product_Routes {
         
         echo '</tbody></table>';
         
+        // Kategori Eşleştirme Bölümü
+        echo '<hr style="margin:40px 0;">';
+        echo '<h2>' . esc_html__('Ürün Kategorisi Eşleştirme', 'woo-uretim-planlama') . '</h2>';
+        echo '<p class="description">' . esc_html__('WooCommerce ürün kategorilerini cabinet tiplerine bağlayın. Böylece ürünleri tek tek işaretlemenize gerek kalmaz.', 'woo-uretim-planlama') . '</p>';
+        
+        // WooCommerce kategorilerini al
+        $product_categories = get_terms(array(
+            'taxonomy' => 'product_cat',
+            'hide_empty' => false,
+            'orderby' => 'name',
+            'order' => 'ASC'
+        ));
+        
+        $category_mappings = self::get_category_mappings();
+        
+        if (!is_wp_error($product_categories) && !empty($product_categories)) {
+            echo '<form id="wup-category-mapping-form">';
+            echo '<table class="widefat fixed striped" style="max-width:700px; margin-top:15px;">';
+            echo '<thead><tr>';
+            echo '<th>' . esc_html__('Ürün Kategorisi', 'woo-uretim-planlama') . '</th>';
+            echo '<th style="width:200px;">' . esc_html__('Cabinet Tipi', 'woo-uretim-planlama') . '</th>';
+            echo '<th style="width:80px;">' . esc_html__('Ürün Sayısı', 'woo-uretim-planlama') . '</th>';
+            echo '</tr></thead>';
+            echo '<tbody>';
+            
+            foreach ($product_categories as $category) {
+                $current_route = isset($category_mappings[$category->term_id]) ? $category_mappings[$category->term_id] : '';
+                $indent = '';
+                
+                // Alt kategori ise girintili göster
+                if ($category->parent > 0) {
+                    $indent = '— ';
+                }
+                
+                echo '<tr>';
+                echo '<td>';
+                echo esc_html($indent . $category->name);
+                if ($category->parent > 0) {
+                    $parent = get_term($category->parent, 'product_cat');
+                    if ($parent && !is_wp_error($parent)) {
+                        echo ' <small style="color:#666;">(' . esc_html($parent->name) . ' altı)</small>';
+                    }
+                }
+                echo '</td>';
+                echo '<td>';
+                echo '<select name="category_mapping[' . esc_attr($category->term_id) . ']" class="wup-category-route-select">';
+                echo '<option value="">' . esc_html__('-- Eşleştirme Yok --', 'woo-uretim-planlama') . '</option>';
+                
+                foreach ($routes as $route) {
+                    $selected = ($current_route === $route['id']) ? 'selected' : '';
+                    echo '<option value="' . esc_attr($route['id']) . '" ' . $selected . ' style="color:' . esc_attr($route['color']) . ';">';
+                    echo esc_html($route['name']);
+                    echo '</option>';
+                }
+                
+                echo '</select>';
+                echo '</td>';
+                echo '<td>' . esc_html($category->count) . '</td>';
+                echo '</tr>';
+            }
+            
+            echo '</tbody></table>';
+            echo '<p style="margin-top:15px;">';
+            echo '<button type="submit" class="button button-primary">' . esc_html__('Eşleştirmeleri Kaydet', 'woo-uretim-planlama') . '</button>';
+            echo '</p>';
+            echo '</form>';
+        } else {
+            WUP_UI::notice(__('Henüz ürün kategorisi oluşturulmamış. WooCommerce → Ürünler → Kategoriler bölümünden kategori ekleyin.', 'woo-uretim-planlama'), 'warning');
+        }
+        
         // JavaScript
         $this->render_scripts();
         
@@ -746,6 +925,32 @@ class WUP_Product_Routes {
                     if (response.success) {
                         alert(response.data.message);
                         location.reload();
+                    } else {
+                        alert(response.data.message || '<?php echo esc_js(__('Bir hata oluştu.', 'woo-uretim-planlama')); ?>');
+                    }
+                });
+            });
+            
+            // Kategori eşleştirme form gönderimi
+            $('#wup-category-mapping-form').on('submit', function(e) {
+                e.preventDefault();
+                
+                var mappings = {};
+                $('select.wup-category-route-select').each(function() {
+                    var catId = $(this).attr('name').match(/\[(\d+)\]/)[1];
+                    var routeId = $(this).val();
+                    if (routeId) {
+                        mappings[catId] = routeId;
+                    }
+                });
+                
+                $.post(ajaxurl, {
+                    action: 'wup_save_category_mapping',
+                    nonce: nonce,
+                    mappings: mappings
+                }, function(response) {
+                    if (response.success) {
+                        alert(response.data.message);
                     } else {
                         alert(response.data.message || '<?php echo esc_js(__('Bir hata oluştu.', 'woo-uretim-planlama')); ?>');
                     }
