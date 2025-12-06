@@ -95,6 +95,16 @@ class WUP_Scheduler {
                 // Mevcut departmanı bul
                 $current_dept = WUP_Departments::get_department_by_status('wc-' . $order->get_status());
                 
+                // Cabinet tiplerini al
+                $cabinet_types = WUP_Product_Routes::get_order_types($order);
+                $cabinet_type_names = array();
+                foreach ($cabinet_types as $type_id) {
+                    $route = WUP_Product_Routes::get($type_id);
+                    if ($route) {
+                        $cabinet_type_names[] = $route['name'];
+                    }
+                }
+                
                 $schedule['orders'][] = array(
                     'order' => $order,
                     'order_id' => $order->get_id(),
@@ -103,6 +113,8 @@ class WUP_Scheduler {
                     'department' => $current_dept ? $current_dept['name'] : '-',
                     'department_color' => $current_dept ? $current_dept['color'] : '#ccc',
                     'department_workers' => $current_dept ? $current_dept['workers'] : 0,
+                    'cabinet_types' => $cabinet_types,
+                    'cabinet_type_names' => $cabinet_type_names,
                     'remaining_seconds' => $remaining['seconds'],
                     'remaining_formatted' => WUP_UI::format_business_hours($remaining['seconds']),
                     'next_statuses' => $remaining['next_statuses'],
@@ -124,20 +136,47 @@ class WUP_Scheduler {
     }
     
     /**
-     * Sipariş için kalan süreyi hesapla (departman bazlı)
+     * Sipariş için kalan süreyi hesapla (ürün rotası ve departman bazlı)
      */
     private function calculate_remaining_time($order) {
         $current_status = 'wc-' . $order->get_status();
-        $all_statuses = array_keys(wc_get_order_statuses());
-        $current_index = array_search($current_status, $all_statuses);
         
         $result = array(
             'seconds' => 0,
             'next_statuses' => array(),
-            'departments' => array()
+            'departments' => array(),
+            'cabinet_types' => array()
         );
         
-        if ($current_index === false || in_array($current_status, $this->final_statuses)) {
+        if (in_array($current_status, $this->final_statuses)) {
+            return $result;
+        }
+        
+        // Önce ürün rotalarına bak (cabinet tiplerine göre)
+        $route_calculation = WUP_Product_Routes::calculate_order_duration($order);
+        
+        if (!empty($route_calculation['types'])) {
+            // Ürün rotası varsa onu kullan
+            $result['seconds'] = $route_calculation['seconds'];
+            $result['departments'] = $route_calculation['departments'];
+            $result['cabinet_types'] = $route_calculation['types'];
+            
+            // Departman isimlerini next_statuses'a ekle (görsellik için)
+            foreach ($route_calculation['departments'] as $dept_id) {
+                $dept = WUP_Departments::get($dept_id);
+                if ($dept) {
+                    $result['next_statuses'][] = $dept['name'];
+                }
+            }
+            
+            return $result;
+        }
+        
+        // Ürün rotası yoksa eski sistemi kullan (durum bazlı)
+        $all_statuses = array_keys(wc_get_order_statuses());
+        $current_index = array_search($current_status, $all_statuses);
+        
+        if ($current_index === false) {
             return $result;
         }
         
@@ -274,13 +313,13 @@ class WUP_Scheduler {
             echo '<thead><tr>';
             echo '<th style="width:70px;">' . esc_html__('Sipariş', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Müşteri', 'woo-uretim-planlama') . '</th>';
+            echo '<th>' . esc_html__('Cabinet Tipi', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Durum', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Departman', 'woo-uretim-planlama') . '</th>';
-            echo '<th>' . esc_html__('İşçi', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Geçmiş Ort.', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Kalan Süre', 'woo-uretim-planlama') . '</th>';
             echo '<th>' . esc_html__('Tahmini Bitiş', 'woo-uretim-planlama') . '</th>';
-            echo '<th>' . esc_html__('Sonraki', 'woo-uretim-planlama') . '</th>';
+            echo '<th>' . esc_html__('Akış', 'woo-uretim-planlama') . '</th>';
             echo '</tr></thead>';
             echo '<tbody>';
             
@@ -291,6 +330,21 @@ class WUP_Scheduler {
                 echo '<tr>';
                 echo '<td><a href="' . esc_url($order_url) . '">#' . esc_html($item['order_id']) . '</a></td>';
                 echo '<td>' . esc_html($item['customer']) . '</td>';
+                
+                // Cabinet tipi
+                echo '<td>';
+                if (!empty($item['cabinet_type_names'])) {
+                    foreach ($item['cabinet_types'] as $type_id) {
+                        $route = WUP_Product_Routes::get($type_id);
+                        if ($route) {
+                            echo '<span style="display:inline-block;padding:2px 6px;border-radius:3px;background:' . esc_attr($route['color']) . ';color:#fff;font-size:0.8em;margin:1px;">' . esc_html($route['name']) . '</span> ';
+                        }
+                    }
+                } else {
+                    echo '<span style="color:#999;">-</span>';
+                }
+                echo '</td>';
+                
                 echo '<td>' . esc_html($status_name) . '</td>';
                 echo '<td>';
                 if ($item['department'] !== '-') {
@@ -298,11 +352,10 @@ class WUP_Scheduler {
                 }
                 echo esc_html($item['department']);
                 echo '</td>';
-                echo '<td>' . ($item['department_workers'] > 0 ? esc_html($item['department_workers']) . ' ' . esc_html__('kişi', 'woo-uretim-planlama') : '-') . '</td>';
                 echo '<td>' . esc_html($item['actual_avg_formatted']) . '</td>';
                 echo '<td>' . esc_html($item['remaining_formatted']) . '</td>';
                 echo '<td>' . esc_html($item['completion_formatted']) . '</td>';
-                echo '<td style="font-size:0.85em;">' . esc_html(implode(' → ', $item['next_statuses'])) . '</td>';
+                echo '<td style="font-size:0.8em;">' . esc_html(implode(' → ', $item['next_statuses'])) . '</td>';
                 echo '</tr>';
             }
             
