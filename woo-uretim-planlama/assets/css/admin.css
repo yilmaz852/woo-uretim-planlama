@@ -1,0 +1,197 @@
+/**
+ * WooCommerce Üretim Planlama - Admin CSS
+ */
+
+/* Genel */
+.wrap h1 {
+    margin-bottom: 15px;
+}
+
+.wrap h2 {
+    margin-top: 30px;
+    margin-bottom: 15px;
+}
+
+/* Filtre Formu */
+.wup-filter-form {
+    background: #fff;
+    padding: 15px;
+    border: 1px solid #ccd0d4;
+    margin-bottom: 20px;
+    border-radius: 4px;
+}
+
+.wup-filter-form .filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.wup-filter-form label {
+    font-weight: 500;
+}
+
+.wup-filter-form input[type="date"],
+.wup-filter-form select {
+    min-width: 150px;
+}
+
+/* Eylem Butonları */
+.wup-actions {
+    margin: 15px 0 20px;
+    display: flex;
+    gap: 10px;
+}
+
+/* Tablolar */
+.wup-schedule-table th,
+.wup-schedule-table td {
+    vertical-align: middle;
+}
+
+.wup-status-durations th {
+    width: 200px;
+    padding-left: 0;
+}
+
+.wup-status-durations td input {
+    margin-right: 5px;
+}
+
+/* Grafik Container - Sabit Boyutlu */
+.wup-chart-container {
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #ccd0d4;
+    margin: 20px 0;
+    border-radius: 4px;
+    position: relative;
+    max-width: 900px;
+}
+
+.wup-chart-container h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+/* Chart wrapper ile boyut kontrolü */
+.wup-chart-wrapper {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    max-height: 300px;
+    overflow: hidden;
+}
+
+.wup-chart-wrapper canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 300px !important;
+}
+
+/* Takvim */
+#wup-calendar-container {
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    margin-top: 20px;
+    max-width: 1200px;
+}
+
+#wup-calendar {
+    font-size: 14px;
+}
+
+.fc-event {
+    cursor: pointer;
+    border: 1px solid #bbb;
+    font-size: 0.9em;
+}
+
+.fc-event-title {
+    white-space: normal;
+    padding: 2px 4px;
+}
+
+/* Özet */
+.wup-summary {
+    background: #fff;
+    padding: 15px 20px;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    margin: 15px 0;
+}
+
+.wup-summary li {
+    margin-bottom: 5px;
+}
+
+/* Status Mesajları */
+.wup-status {
+    margin-left: 10px;
+    font-weight: 500;
+}
+
+.wup-status.loading {
+    color: #f39c12;
+}
+
+.wup-status.success {
+    color: #27ae60;
+}
+
+.wup-status.error {
+    color: #e74c3c;
+}
+
+/* Dashboard Widget */
+.wup-widget table {
+    margin: 10px 0;
+}
+
+.wup-widget p {
+    margin: 5px 0;
+}
+
+/* Form Table */
+.form-table th {
+    width: 250px;
+}
+
+.form-table .description {
+    font-style: italic;
+    color: #666;
+}
+
+/* Responsive */
+@media (max-width: 782px) {
+    .wup-filter-form .filter-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .wup-filter-form input[type="date"],
+    .wup-filter-form select {
+        width: 100%;
+        min-width: 0;
+        margin-bottom: 5px;
+    }
+    
+    .wup-chart-container {
+        max-width: 100%;
+    }
+    
+    .form-table th,
+    .wup-status-durations th {
+        width: auto;
+    }
+    
+    .wup-actions {
+        flex-direction: column;
+    }
+}
